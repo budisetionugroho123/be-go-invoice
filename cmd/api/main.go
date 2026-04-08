@@ -6,6 +6,7 @@ import (
 
 	"github.com/budisetionugroho123/be-go-invoice/internal/config"
 	"github.com/budisetionugroho123/be-go-invoice/internal/database"
+	"github.com/budisetionugroho123/be-go-invoice/internal/routes"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -22,7 +23,7 @@ func main() {
 	// Connect to database
 	db := database.Connect(cfg)
 
-	// Auto-migrate & seed
+	// Auto-migrate & seed (Zero-Setup)
 	database.Migrate(db)
 	database.Seed(db)
 
@@ -33,7 +34,11 @@ func main() {
 
 	// Global middleware
 	app.Use(fiberLogger.New())
-	app.Use(cors.New())
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "*",
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+		AllowMethods: "GET, POST, PUT, DELETE, OPTIONS",
+	}))
 
 	// Health check
 	app.Get("/health", func(c *fiber.Ctx) error {
@@ -43,8 +48,8 @@ func main() {
 		})
 	})
 
-	// TODO: Register routes here
-	_ = db // will be used when registering routes
+	// Register all routes
+	routes.SetupRoutes(app, db, cfg)
 
 	// Start server
 	port := cfg.AppPort
