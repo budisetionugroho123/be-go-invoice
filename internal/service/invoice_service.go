@@ -1,8 +1,12 @@
 package service
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"net/http"
 	"time"
 
 	"github.com/budisetionugroho123/be-go-invoice/internal/models"
@@ -121,5 +125,39 @@ func (s *InvoiceService) CreateInvoice(req CreateInvoiceRequest, userID uint) (*
 		return nil, fmt.Errorf("invoice created but failed to reload: %w", err)
 	}
 
+	// ── BONUS: Async Webhook Integration
+	go s.sendWebhook(savedInvoice)
+
 	return savedInvoice, nil
+}
+
+func (s *InvoiceService) sendWebhook(invoice *models.Invoice) {
+	webhookUrl := "https://webhook.site/dummy-fleetify-webhook" // Ganti dummy url ini jika untuk testing live
+
+	payload, err := json.Marshal(invoice)
+	if err != nil {
+		log.Printf("❌ Webhook error: failed to marshal payload - %v\n", err)
+		return
+	}
+
+	req, err := http.NewRequest("POST", webhookUrl, bytes.NewBuffer(payload))
+	if err != nil {
+		log.Printf("❌ Webhook error: failed to construct request - %v\n", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("⚠️ Webhook error: failed to send - %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		log.Printf("✅ Webhook sent successfully for invoice %s\n", invoice.InvoiceNumber)
+	} else {
+		log.Printf("⚠️ Webhook warning: received status code %d\n", resp.StatusCode)
+	}
 }
